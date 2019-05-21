@@ -1,15 +1,11 @@
 import jdk.nashorn.api.tree.*;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ClojureVisitor extends SimpleTreeVisitorES6<StringBuilder, Boolean> {
     private final String LINE_SEPARATOR = "\n";
     //Queue<Pair> stack;
     private Map<String, FunctionProperties> changedFunction;
-    StringBuilder newTopLevelFunctions;
     public ClojureVisitor() {
         super();
         changedFunction = new HashMap<>();
@@ -21,6 +17,7 @@ public class ClojureVisitor extends SimpleTreeVisitorES6<StringBuilder, Boolean>
         node.getSourceElements().forEach((tree) -> {
             result.append(tree.accept(this, false));
         });
+        result.append(printNewFunctions());
         return result;
     }
 
@@ -74,49 +71,41 @@ public class ClojureVisitor extends SimpleTreeVisitorES6<StringBuilder, Boolean>
         return binaryCode;
     }
 
-    //change old name to new name and add new arguments
     @Override
     public StringBuilder visitFunctionDeclaration(FunctionDeclarationTree node, Boolean isNestedFunction) {
-        //todo correct arguments
         String functionName = node.getName().accept(this, isNestedFunction).toString();
         StringBuilder functionBody = node.getBody().accept(this, true);
+        List<String> oldArguments = getListArguments(node.getParameters(), isNestedFunction);
+
         StringBuilder functionDeclaration = new StringBuilder("function ");
-        List<? extends ExpressionTree> oldArguments = node.getParameters();
         if (!isNestedFunction) {
             functionDeclaration.append(functionName);
             functionDeclaration.append("(");
-            functionDeclaration.append(printArguments(oldArguments, true));
+            functionDeclaration.append(printArguments(oldArguments));
             functionDeclaration.append(") ");
             functionDeclaration.append(functionBody);
-
+            return functionDeclaration;
         } else {
-
-            changedFunction.put(functionName, new FunctionProperties(takeNewName(functionName), Collections.emptyList(), functionBody));
+            List<String> internalUsedVariables = new ArrayList<>();
+            node.accept(new CollectorIdentifiersVisitor(), new Pair(internalUsedVariables, false));
+            changedFunction.put(functionName, new FunctionProperties(internalUsedVariables, functionBody));
             return new StringBuilder();
         }
-
-        return functionDeclaration;
     }
 
     @Override
     public StringBuilder visitFunctionCall(FunctionCallTree node, Boolean r) {
         StringBuilder functionName = node.getFunctionSelect().accept(this, r);
-        if (!changedFunction.containsKey(functionName.toString())) {
-            throw new IllegalArgumentException("Function " + functionName + "doesn't declared in current scope");
-        }
-        FunctionProperties properties = changedFunction.get(functionName.toString());
-        StringBuilder functionCallCode = new StringBuilder(properties.getName());
-        functionCallCode.append("(");
-        functionCallCode.append(printArguments(node.getArguments(), r));
-        if (!properties.newArguments.isEmpty()) {
-            functionCallCode.append(", ");
-        }
-        //todo print arguments
-        for (int i = 0; i < properties.newArguments.size(); ++i) {
-            functionCallCode.append(properties.newArguments.get(i));
-            if (i < properties.newArguments.size() - 1) {
+        StringBuilder functionCallCode = new StringBuilder(functionName).append("(");
+        List<String> requiredArguments = getListArguments(node.getArguments(), r);
+        functionCallCode.append(printArguments(requiredArguments));
+        if (changedFunction.containsKey(functionName.toString())) {
+            List<String> newArguments = changedFunction.get(functionName.toString()).getArguments();
+            List<String> additionalArguments = newArguments.subList(requiredArguments.size(), newArguments.size());
+            if (!requiredArguments.isEmpty() && !additionalArguments.isEmpty()) {
                 functionCallCode.append(", ");
             }
+            functionCallCode.append(printArguments(additionalArguments));
         }
         functionCallCode.append(")");
         return functionCallCode;
@@ -154,10 +143,10 @@ public class ClojureVisitor extends SimpleTreeVisitorES6<StringBuilder, Boolean>
         return super.visitUnary(node, r);
     }
 
-    private StringBuilder printArguments(List<? extends ExpressionTree> arguments, Boolean r) {
+    private StringBuilder printArguments(List<String> arguments) {
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < arguments.size(); ++i) {
-            result.append(arguments.get(i).accept(this, r));
+            result.append(arguments.get(i));
             if (i < arguments.size() - 1) {
                 result.append(", ");
             }
@@ -165,32 +154,42 @@ public class ClojureVisitor extends SimpleTreeVisitorES6<StringBuilder, Boolean>
         return result;
     }
 
-    //todo realize
-    private StringBuilder takeNewName(String oldName) {
-        return new StringBuilder(oldName);
+    private List<String> getListArguments(List<? extends ExpressionTree> arguments, Boolean r) {
+        List<String> result = new ArrayList<>();
+        for (int i = 0; i < arguments.size(); ++i) {
+            result.add(arguments.get(i).accept(this, r).toString());
+        }
+        return result;
+    }
+
+    private StringBuilder printNewFunctions() {
+        StringBuilder result = new StringBuilder();
+        for (Map.Entry<String, FunctionProperties> newFunction: changedFunction.entrySet()) {
+            result.append(newFunction.getKey()).append("(");
+            FunctionProperties functionProperties = newFunction.getValue();
+            result.append(printArguments(functionProperties.getArguments()));
+            result.append(") ").append(functionProperties.getBody());
+        }
+        return result;
     }
 
     public class FunctionProperties {
-        private StringBuilder name;
-        private List<String> newArguments;
+        private List<String> arguments;
         private StringBuilder body;
 
-        public FunctionProperties(StringBuilder name, List<String> newArguments, StringBuilder body) {
-            this.name = name;
-            this.newArguments = newArguments;
+        public FunctionProperties(List<String> arguments, StringBuilder body) {
+            this.arguments = arguments;
             this.body = body;
         }
 
-        public StringBuilder getName() {
-            return name;
-        }
-
-        public List<String> getNewArguments() {
-            return newArguments;
+        public List<String> getArguments() {
+            return arguments;
         }
 
         public StringBuilder getBody() {
             return body;
         }
+
+
     }
 }
