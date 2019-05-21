@@ -1,8 +1,10 @@
+package main;
+
 import java.util.List;
 
 public class Pair {
-    List<String> variables;
-    Boolean fromVariableTree;
+    private List<String> variables;
+    private Boolean fromVariableTree;
 
     public Pair(List<String> variables, Boolean fromVariableTree) {
         this.variables = variables;
@@ -13,15 +15,7 @@ public class Pair {
         return variables;
     }
 
-    public void setVariables(List<String> variables) {
-        this.variables = variables;
-    }
-
     public Boolean getFromVariableTree() {
         return fromVariableTree;
-    }
-
-    public void setFromVariableTree(Boolean fromVariableTree) {
-        this.fromVariableTree = fromVariableTree;
     }
 }

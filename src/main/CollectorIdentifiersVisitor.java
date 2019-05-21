@@ -1,7 +1,6 @@
-import jdk.nashorn.api.tree.BlockTree;
-import jdk.nashorn.api.tree.IdentifierTree;
-import jdk.nashorn.api.tree.SimpleTreeVisitorES6;
-import jdk.nashorn.api.tree.VariableTree;
+package main;
+
+import jdk.nashorn.api.tree.*;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -15,6 +14,7 @@ public class CollectorIdentifiersVisitor extends SimpleTreeVisitorES6<Void, Pair
         super();
         ownVariables = new ArrayList<>();
         putedVariables = new HashSet<>();
+        ownVariables.add(new HashSet<>());
     }
 
     @Override
@@ -52,6 +52,25 @@ public class CollectorIdentifiersVisitor extends SimpleTreeVisitorES6<Void, Pair
             tree.accept(this, r);
         });
         ownVariables.remove(ownVariables.size() - 1);
+        return null;
+    }
+
+
+    //pass function name identifier
+    @Override
+    public Void visitFunctionCall(FunctionCallTree node, Pair r) {
+        node.getArguments().forEach((tree) -> {
+            tree.accept(this, r);
+        });
+        return null;
+    }
+
+    @Override
+    public Void visitFunctionDeclaration(FunctionDeclarationTree node, Pair r) {
+        node.getParameters().forEach((tree) -> {
+            tree.accept(this, new Pair(r.getVariables(), true));
+        });
+        node.getBody().accept(this, r);
         return null;
     }
 }
