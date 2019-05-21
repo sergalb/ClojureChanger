@@ -1,14 +1,4 @@
-var d = 0;
 function foo(a) {
-    var b = 42;
-    function bar() {
-        var c = a % 2;
-        function baz(d) {
-            return a * (d + 1);
-        }
-        return baz(a + (-0));
-    }
-    return bar();
+    return a;
 }
-
 foo(1);

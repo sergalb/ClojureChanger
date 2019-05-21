@@ -151,7 +151,7 @@ public class ClojureVisitor implements TreeVisitor<StringBuilder, Boolean> {
         } else {
             List<String> internalUsedVariables = new ArrayList<>();
             node.accept(new CollectorIdentifiersVisitor(), new Pair(internalUsedVariables, false));
-            changedFunction.put(functionName, new FunctionProperties(internalUsedVariables, functionBody));
+            changedFunction.put(functionName, new FunctionProperties(oldArguments, internalUsedVariables, functionBody));
             return new StringBuilder();
         }
     }
@@ -164,11 +164,10 @@ public class ClojureVisitor implements TreeVisitor<StringBuilder, Boolean> {
         functionCallCode.append(printArguments(requiredArguments));
         if (changedFunction.containsKey(functionName.toString())) {
             List<String> newArguments = changedFunction.get(functionName.toString()).getArguments();
-            List<String> additionalArguments = newArguments.subList(requiredArguments.size(), newArguments.size());
-            if (!requiredArguments.isEmpty() && !additionalArguments.isEmpty()) {
+            if (!requiredArguments.isEmpty() && !newArguments.isEmpty()) {
                 functionCallCode.append(", ");
             }
-            functionCallCode.append(printArguments(additionalArguments));
+            functionCallCode.append(printArguments(newArguments));
         }
         functionCallCode.append(")");
         return functionCallCode;
@@ -279,6 +278,10 @@ public class ClojureVisitor implements TreeVisitor<StringBuilder, Boolean> {
         for (Map.Entry<String, FunctionProperties> newFunction: changedFunction.entrySet()) {
             result.append("function ").append(newFunction.getKey()).append("(");
             FunctionProperties functionProperties = newFunction.getValue();
+            result.append(printArguments(functionProperties.getOldArguments()));
+            if (!functionProperties.getOldArguments().isEmpty() && !functionProperties.getArguments().isEmpty()) {
+                result.append(", ");
+            }
             result.append(printArguments(functionProperties.getArguments()));
             result.append(") ").append(functionProperties.getBody());
         }
@@ -286,12 +289,18 @@ public class ClojureVisitor implements TreeVisitor<StringBuilder, Boolean> {
     }
 
     public class FunctionProperties {
+        private List<String> oldArguments;
         private List<String> arguments;
         private StringBuilder body;
 
-        public FunctionProperties(List<String> arguments, StringBuilder body) {
+        public FunctionProperties(List<String> oldArguments, List<String> arguments, StringBuilder body) {
+            this.oldArguments = oldArguments;
             this.arguments = arguments;
             this.body = body;
+        }
+
+        public List<String> getOldArguments() {
+            return oldArguments;
         }
 
         public List<String> getArguments() {
@@ -301,6 +310,7 @@ public class ClojureVisitor implements TreeVisitor<StringBuilder, Boolean> {
         public StringBuilder getBody() {
             return body;
         }
+
     }
 
 
